@@ -1,0 +1,236 @@
+<div id="manage-options-panel" data-index="attribute_options_select_container">
+    <table class="admin__control-table" data-index="attribute_options_select">
+        <colgroup>
+            <col width="1" />
+            <col />
+            <col width="1" />
+            <col width="1" />
+        </colgroup>
+        <thead>
+            <tr id="attribute-options-table">                
+                <th class="col-block">
+                    <span><?= $block->escapeHtml(__('Type')) ?></span>
+                </th>
+                <th class="col-block">
+                    <span><?= $block->escapeHtml(__('Block')) ?></span>
+                </th>
+                <th class="col-sort-order">
+                    <span><?= $block->escapeHtml(__('Position')) ?></span>
+                </th>
+                <th class="col-delete">&nbsp;</th>
+            </tr>
+        </thead>
+        <tbody data-role="options-container" class="ignore-validate"></tbody>
+        <tfoot>
+            <tr>
+                <th colspan="100" class="col-actions-add">
+                    <button id="add_new_option_button" data-action="add_new_row"
+                        title="<?= $block->escapeHtml(__('Add Section')); ?>"
+                        type="button" class="action- scalable add">
+                        <span><?= $block->escapeHtml(__('Add Section')); ?></span>
+                    </button>
+                </th>
+            </tr>
+        </tfoot>
+    </table>
+    <input type="hidden" id="option-count-check" value="" />
+</div>
+<script id="row-template" type="text/x-magento-template">
+     <tr>        
+        <td class="col-block">
+            <select name="type[]" id="option_type_<%- data.id %>" data-id="<%- data.id %>" style="width: 260px; max-width: 260px;" class="select-type admin__control-select">
+                <option value="<?= \Magesanjay\Advertisement\Block\Adminhtml\Options::TYPE_NONE; ?>"><?= __('[ SELECT TYPE ]'); ?></option>
+                <option value="<?= \Magesanjay\Advertisement\Block\Adminhtml\Options::TYPE_BLOCK; ?>"><?= __('Block'); ?></option>
+            </select>
+        </td>
+        <td class="col-block">
+            <select name="block[]" id="option_block_<%- data.id %>" style="width: 100%; max-width: 100%" class="select-block admin__control-select">
+                <option value="0"><?= __('[ SELECT BLOCK ]'); ?></option>
+            </select>
+        </td>
+        <td class="col-sort-order">
+            <input data-role="order" type="text" class="sort-order admin__control-text" style="width: 160px; max-width: 160px;" name="option[order][<%- data.id %>]" value="<%- data.sort_order %>" />
+        </td>
+        <td id="delete_button_container_<%- data.id %>" class="col-delete">
+            <input type="hidden" class="delete-flag" name="option[delete][<%- data.id %>]" value="" />
+            <button id="delete_button_<%- data.id %>" title="<?= $block->escapeHtml(__('Delete')) ?>" type="button" class="action- scalable delete delete-option">
+                <span><?= $block->escapeHtml(__('Delete')) ?></span>
+            </button>
+        </td>
+    </tr>
+</script>
+
+<script>
+require([
+    'jquery',
+    'mage/template',
+    'uiRegistry',
+    'jquery/ui',
+    'prototype',
+    'form',
+    'validation'
+], function (jQuery, mageTemplate, rg) {
+    'use strict';
+
+    var attributeOption = {
+        table: $('attribute-options-table'),
+        itemCount: 0,
+        totalItems: 0,
+        rendered: 0,
+        template: mageTemplate('#row-template'),
+        add: function (data, render) {
+            var isNewOption = false, element;
+
+            if (typeof data.id == 'undefined') {
+                data = {
+                    'id': 'option_' + this.itemCount,
+                    'sort_order': 0
+                };
+                isNewOption = true;
+            }
+
+            element = this.template({
+                data: data
+            });
+
+            if (isNewOption && !this.isReadOnly) {
+                this.enableNewOptionDeleteButton(data.id);
+            }
+
+            this.itemCount++;
+            this.totalItems++;
+            this.elements += element;
+
+            if (render) {
+                this.render();
+                this.updateItemsCountField();
+                this.setLayoutJSON();
+            }
+
+            if (typeof data.select_type != 'undefined') {
+                $("option_type_" + data.id).setValue(data.select_type);
+                this.change(undefined, data);
+            }
+        },
+        change: function (event, data) {
+            var param = 'ajax=1';
+            if(event != undefined)
+                param += '&type=' + $(event.target).getValue();
+            else
+                param += '&type=' + data.select_type;
+
+            jQuery.ajax({
+                showLoader: true,
+                url: '<?= $this->getUrl('categoryview/index/block'); ?>',
+                data: param,
+                type: "POST",
+                dataType: 'json'
+            }).done(function (response) {
+                var option_id = 'option_0';
+                if(event != undefined)
+                    option_id = $(event.target).getAttribute('data-id');
+                else
+                    option_id = data.id;
+
+                jQuery("#option_block_" + option_id).html('');
+                jQuery(response).each(function(index, element) {
+                    jQuery("#option_block_" + option_id).append(jQuery("<option></option>").attr('value', element.value).html(element.label));
+                });
+
+                if(event == undefined)
+                   jQuery("#option_block_" + option_id).val(data.select_block);
+
+                attributeOption.setLayoutJSON();
+            });
+        },
+        remove: function (event) {
+            var element = $(Event.findElement(event, 'tr')), elementFlags; // !!! Button already have table parent in safari
+
+            // Safari workaround
+            element.ancestors().each(function (parentItem) {
+                if (parentItem.hasClassName('option-row')) {
+                    element = parentItem;
+                    throw $break;
+                } else if (parentItem.hasClassName('box')) {
+                    throw $break;
+                }
+            });
+
+            if (element) {
+                elementFlags = element.getElementsByClassName('delete-flag');
+
+                if (elementFlags[0]) {
+                    elementFlags[0].value = 1;
+                }
+
+                element.addClassName('no-display');
+                element.addClassName('template');
+                element.hide();
+                this.totalItems--;
+                this.updateItemsCountField();
+                this.setLayoutJSON();
+            }
+        },
+        enableNewOptionDeleteButton: function (id) {
+            $$('#delete_button_container_' + id + ' button').each(function (button) {
+                button.enable();
+                button.removeClassName('disabled');
+            });
+        },
+        render: function () {
+            Element.insert($$('[data-role=options-container]')[0], this.elements);
+            this.elements = '';
+        },
+        updateItemsCountField: function () {
+            $('option-count-check').value = this.totalItems > 0 ? '1' : '';
+        },
+        setLayoutJSON: function() {
+            var layoutValues = new Array();
+            jQuery('[data-role=options-container] tr').each(function (index, element) {
+                if(jQuery(this).find('.delete-flag').val() != '1') {
+                    var element = {
+                        'id': 'option_' + index,
+                        'select_type': jQuery(this).find('.select-type').val(),
+                        'select_block': jQuery(this).find('.select-block').val(),
+                        'sort_order': jQuery(this).find('.sort-order').val()
+                    };
+                    layoutValues.push(element);
+                }
+            });
+            jQuery('input[name=block_layout]').val(JSON.stringify(layoutValues)).trigger('change');
+        }
+    };
+
+    if(jQuery('input[name=block_layout]').val() != undefined && jQuery('input[name=block_layout]').val() != "") {
+        var layoutValues = jQuery('input[name=block_layout]').val();
+        layoutValues = jQuery.parseJSON(layoutValues);
+        jQuery(layoutValues).each(function(index, element) {
+            attributeOption.add(element, true);
+        });
+    }
+
+    if ($('add_new_option_button')) {
+        Event.observe('add_new_option_button', 'click', attributeOption.add.bind(attributeOption, {}, true));
+    }
+
+    $('manage-options-panel').on('click', '.delete-option', function (event) {
+        attributeOption.remove(event);
+    });
+
+    $('manage-options-panel').on('change', '.select-block', function (event) {
+        attributeOption.setLayoutJSON();
+    });
+
+    $('manage-options-panel').on('keyup', '.sort-order', function (event) {
+        attributeOption.setLayoutJSON();
+    });
+
+    $('manage-options-panel').on('focusout', '.sort-order', function (event) {
+        attributeOption.setLayoutJSON();
+    });
+
+    $('manage-options-panel').on('change', '.select-type', function (event) {
+        attributeOption.change(event, {});
+    });
+});
+</script>
