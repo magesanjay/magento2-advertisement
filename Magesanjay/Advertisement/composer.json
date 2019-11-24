@@ -1,7 +1,7 @@
 {
     "name": "magesanjay/advertisement",
     "description": "Magento2 Advertisement Module",
-    "homepage": "https://github.com/mageprince/magento2-advertisement",
+    "homepage": "https://github.com/magesanjay/magento2-advertisement",
     "type": "magento2-module",
     "version": "1.0.5",
     "license": "GPL-3.0-or-later",
@@ -12,7 +12,7 @@
         }
     ],
     "support": {
-        "issues": "https://github.com/mageprince/magento2-advertisement/issues"
+        "issues": "https://github.com/magesanjay/magento2-advertisement/issues"
     },
     "autoload": {
         "files": [
